@@ -1,223 +1,140 @@
-// Live production Render URL
-const API_BASE = "https://bank-fraud-detection-1-hfr0.onrender.com";
+const express = require('express');
+const cors = require('cors');
 
-let clientCasesList = [];
-let activeTargetIndex = null;
-let userRole = ""; 
+const app = express();
+const PORT = process.env.PORT || 5000;
 
-// Helper function to streamline cross-origin session requests
-const fetchOptions = (options = {}) => ({
-    credentials: 'include',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
+// ==========================================
+// 1. STRICT CORS CONFIGURATION (MUST BE FIRST)
+// ==========================================
+// Because your frontend uses `credentials: 'include'`, we MUST specify the
+// exact origin domain. Wildcards (*) will fail when credentials are true.
+const corsOptions = {
+    origin: 'https://krutikawarke2005-rgb.github.io', 
+    credentials: true, // Crucial to accept incoming cross-origin sessions/cookies
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 200 // Safeguard for older browsers / preflights
+};
+
+// Apply CORS options globally across all routing pipelines
+app.use(cors(corsOptions));
+
+// Explicitly handle browser CORS preflight OPTIONS requests across all paths
+app.options('*', cors(corsOptions));
+
+
+// ==========================================
+// 2. STANDARD MIDDLEWARE
+// ==========================================
+app.use(express.json()); // Parses application/json incoming payloads
+
+
+// ==========================================
+// 3. MOCK DATABASE SEED DATA
+// ==========================================
+let clientCasesList = [
+    {
+        id: "CASE-9901",
+        name: "John Doe",
+        account: "XXXX-XXXX-1234",
+        device: "iPhone 15 Pro",
+        location: "New York, USA",
+        amount: "$4,500",
+        riskPercent: 92,
+        description: "Multiple high-velocity transactions detected outside habitual spending parameters."
     }
+];
+
+let metricsData = {
+    fraudBlockedCount: 14,
+    mitigatedExposureAmount: 124500
+};
+
+
+// ==========================================
+// 4. API ROUTING ENDPOINTS
+// ==========================================
+
+// --- AUTH ROUTING ---
+app.post('/auth/login', (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: "Missing authentication fields." });
+    }
+
+    // Replace with real database lookup or JWT creation logic as required
+    if (email === "admin@securebank.com") {
+        return res.json({ 
+            email: email, 
+            role: "Admin" 
+        });
+    }
+
+    res.json({ 
+        email: email, 
+        role: "Staff" 
+    });
 });
 
-// ==========================================
-// LOGIN PROCESS
-// ==========================================
-async function processLogin(event) {
-    event.preventDefault();
-    const emailValue = document.getElementById("staff-email").value.trim();
-    const passwordValue = document.getElementById("staff-password").value;
-    const errorLog = document.getElementById("login-error");
+app.post('/auth/logout', (req, res) => {
+    // Session termination/cookie clearance routine should go here if relevant
+    res.json({ success: true, message: "Session signed out securely." });
+});
 
-    try {
-        const response = await fetch(`${API_BASE}/auth/login`, fetchOptions({
-            method: 'POST',
-            body: JSON.stringify({ email: emailValue, password: passwordValue })
-        }));
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            errorLog.innerText = data.error || "Authentication Refused.";
-            return;
-        }
-
-        userRole = data.role;
-        errorLog.style.color = "var(--color-success)";
-        errorLog.innerText = `Logged in as ${userRole}...`;
-
-        setTimeout(() => {
-            document.getElementById("login-screen").classList.add("hidden");
-            document.getElementById("dashboard-screen").classList.remove("hidden");
-            document.getElementById("logged-user").innerText = data.email;
-            
-            if (userRole === "Admin") {
-                console.log("Admin permissions granted.");
-            }
-            
-            fetchPipelineData();
-        }, 800);
-
-    } catch (err) {
-        errorLog.innerText = "Network Error: Could not connect to backend server.";
-    }
-}
-
-async function logOut() {
-    await fetch(`${API_BASE}/auth/logout`, fetchOptions({ method: 'POST' }));
-    document.getElementById("auth-form").reset();
-    document.getElementById("login-error").innerText = "";
-    document.getElementById("dashboard-screen").classList.add("hidden");
-    document.getElementById("login-screen").classList.remove("hidden");
-    userRole = ""; 
-}
-
-// ==========================================
-// GET DATA FROM BACKEND
-// ==========================================
-async function fetchPipelineData() {
-    try {
-        const response = await fetch(`${API_BASE}/dashboard/data`, fetchOptions());
-        const data = await response.json();
-        
-        clientCasesList = data.cases;
-        renderDashboardView(data.metrics);
-    } catch (err) {
-        console.error("Failure fetching metrics:", err);
-    }
-}
-
-// ==========================================
-// RENDER DATA TO YOUR EXISTING HTML
-// ==========================================
-function renderDashboardView(metrics) {
-    const tableBody = document.getElementById("table-rows");
-    tableBody.innerHTML = ""; 
-
-    document.getElementById("fraud-blocked-count").innerText = metrics.fraudBlockedCount;
-    document.getElementById("mitigated-exposure-amount").innerText = `$${metrics.mitigatedExposureAmount.toLocaleString()}`;
-
-    if (clientCasesList.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:3rem;">No pending incidents.</td></tr>`;
-        document.getElementById("total-cases-count").innerText = "0";
-        return;
-    }
-
-    const activeThreat = clientCasesList[0];
-    document.getElementById("alert-victim").innerText = activeThreat.name;
-    document.getElementById("alert-method").innerText = activeThreat.vector;
-    document.getElementById("alert-percentage").innerText = `${activeThreat.riskPercent}%`;
-    
-    document.getElementById("total-cases-count").innerText = clientCasesList.length;
-
-    clientCasesList.forEach((caseItem, index) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td><code>${caseItem.id}</code></td>
-            <td><strong>${caseItem.name}</strong><br><small>${caseItem.account}</small></td>
-            <td>${caseItem.device}</td>
-            <td>${caseItem.location}</td>
-            <td><strong>${caseItem.amount}</strong></td>
-            <td>${caseItem.riskPercent}%</td>
-            <td>Pending</td>
-            <td><button onclick="openPopupInspector(${index})">Investigate</button></td>
-        `;
-        tableBody.appendChild(tr);
+// --- DASHBOARD DATA ROUTING ---
+app.get('/dashboard/data', (req, res) => {
+    res.json({
+        metrics: metricsData,
+        cases: clientCasesList,
+        auditLogs: [
+            "⚙️ SYSTEM BOOTSTRAP: Secure gateway firewall handshakes online.",
+            "🤖 ANOMALY ENGINE: Behavioral analysis model metrics synced normally.",
+            "🛡️ ACCESS LOG: User authentication validated successfully."
+        ]
     });
-}
+});
+
+
+// --- CASE RESOLUTION ROUTING ---
+app.post('/cases/resolve', (req, res) => {
+    const { caseId, isFraud } = req.body;
+    
+    // Filter and pull item matching incoming requirement
+    clientCasesList = clientCasesList.filter(c => c.id !== caseId);
+    
+    if (isFraud) {
+        metricsData.fraudBlockedCount += 1;
+    }
+
+    res.json({ success: true, message: "Case updated successfully." });
+});
+
+
+// --- SIMULATED EMERGENCY DATA ROUTING ---
+app.post('/cases/simulate', (req, res) => {
+    const randomId = `CASE-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newCase = {
+        id: randomId,
+        name: "Jane Smith",
+        account: "XXXX-XXXX-5678",
+        device: "Samsung S24 Ultra",
+        location: "London, UK",
+        amount: "$12,800",
+        riskPercent: Math.floor(40 + Math.random() * 55),
+        description: "Simulated anomaly transaction flag triggered via remote endpoint."
+    };
+
+    clientCasesList.unshift(newCase);
+    res.json({ success: true, case: newCase });
+});
+
 
 // ==========================================
-// POPUP CONTROLS
+// 5. SERVER INITIALIZATION
 // ==========================================
-function openPopupInspector(index) {
-    activeTargetIndex = index;
-    const item = clientCasesList[index];
-
-    document.getElementById("pop-case-id").innerText = item.id;
-    document.getElementById("pop-name").innerText = item.name;
-    document.getElementById("pop-acc").innerText = item.account;
-    document.getElementById("pop-amt").innerText = item.amount;
-    document.getElementById("pop-loc").innerText = item.location;
-    document.getElementById("pop-device").innerText = item.device;
-    document.getElementById("pop-desc").innerText = item.description;
-
-    document.getElementById("action-popup").classList.add("active");
-}
-
-function closePopup() {
-    document.getElementById("action-popup").classList.remove("active");
-    activeTargetIndex = null;
-}
-
-async function handleResolution(actionMessage, isFraudCounterIncrement) {
-    if (activeTargetIndex === null) return;
-    
-    if (isFraudCounterIncrement === false && userRole !== "Admin" && clientCasesList[activeTargetIndex].riskPercent > 90) {
-        alert("Action Denied: Only an Admin can dismiss high-risk threats.");
-        return;
-    }
-
-    const targetCase = clientCasesList[activeTargetIndex];
-    
-    try {
-        const response = await fetch(`${API_BASE}/cases/resolve`, fetchOptions({
-            method: 'POST',
-            body: JSON.stringify({
-                caseId: targetCase.id,
-                isFraud: isFraudCounterIncrement
-            })
-        }));
-        
-        if (response.ok) {
-            alert(`Action completed: ${actionMessage}`);
-            closePopup();
-            fetchPipelineData(); 
-        }
-    } catch (err) {
-        alert("Network error processing resolution.");
-    }
-}
-
-async function addNewSimulatedFraud() {
-    try {
-        const response = await fetch(`${API_BASE}/cases/simulate`, fetchOptions({ method: 'POST' }));
-        if (response.ok) {
-            fetchPipelineData();
-        }
-    } catch (err) {
-        console.error("Failed to simulate threat:", err);
-    }
-}
-
-async function checkAdminAccess() {
-    if (userRole === "Admin") {
-        try {
-            const response = await fetch(`${API_BASE}/dashboard/data`, fetchOptions());
-            const data = await response.json();
-            
-            const logRows = document.getElementById("audit-log-rows");
-            logRows.innerHTML = ""; 
-            
-            const logs = (data && data.auditLogs && data.auditLogs.length > 0) ? data.auditLogs : [
-                "⚙️ SYSTEM BOOTSTRAP: Secure gateway firewall handshakes online.",
-                "🤖 ANOMALY ENGINE: Behavioral analysis model metrics synced normally.",
-                "🛡️ ACCESS LOG: Admin authenticated successfully."
-            ];
-            
-            logs.forEach(log => {
-                logRows.innerHTML += `<div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">${log}</div>`;
-            });
-            
-            document.getElementById("audit-log-section").style.display = "block";
-            alert("Access Granted: Displaying decrypted secure security trailing logs.");
-            
-        } catch (err) {
-            const logRows = document.getElementById("audit-log-rows");
-            logRows.innerHTML = `
-                <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">⚙️ SYSTEM BOOTSTRAP: Secure gateway firewall handshakes online.</div>
-                <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">🤖 ANOMALY ENGINE: Behavioral analysis model metrics synced normally.</div>
-                <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); color: var(--color-danger);">⚠️ LOCAL MODE: Backend pipeline connection handshake timed out. Showing cached logs.</div>
-            `;
-            document.getElementById("audit-log-section").style.display = "block";
-            alert("Access Granted: Displaying decrypted secure security trailing logs.");
-        }
-    } else {
-        document.getElementById("audit-log-section").style.display = "none";
-        alert("Access Denied: This feature is strictly restricted to Admin accounts.");
-    }
-}
+app.listen(PORT, () => {
+    console.log(`Backend server successfully initialized on port ${PORT}`);
+});
