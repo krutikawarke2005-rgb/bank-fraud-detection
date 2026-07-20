@@ -5,7 +5,7 @@ import random
 app = Flask(__name__)
 
 # REPLACE THIS URL with your actual GitHub Pages deployment URL
-CORS(app, supports_credentials=True, origins=["https://your-github-username.github.io"])
+CORS(app, supports_credentials=True, origins=["https://krutikawarke2005-rgb.github.io"])
 
 app.secret_key = 'super_secure_bank_operational_encryption_token_key'
 
