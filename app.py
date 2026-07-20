@@ -4,10 +4,24 @@ import random
 
 app = Flask(__name__)
 
-# REPLACE THIS URL with your actual GitHub Pages deployment URL
-CORS(app, supports_credentials=True, origins=["https://krutikawarke2005-rgb.github.io"])
+# 1. Airtight CORS Configuration
+CORS(app, 
+     supports_credentials=True, 
+     origins=[
+         "https://krutikawarke2005-rgb.github.io",
+         "https://krutikawarke2005-rgb.github.io/bank-fraud-detection"
+     ],
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "OPTIONS"])
 
 app.secret_key = 'super_secure_bank_operational_encryption_token_key'
+
+# 2. REQUIRED FOR CROSS-DOMAIN SESSIONS (github.io <-> onrender.com)
+app.config.update(
+    SESSION_COOKIE_SAMESITE='None',
+    SESSION_COOKIE_SECURE=True,  # Requires HTTPS (which Render provides automatically)
+    SESSION_COOKIE_HTTPONLY=True
+)
 
 # LIVE RUNTIME DATABASE STRUCTURE
 daily_metrics = {
@@ -39,6 +53,17 @@ fraud_cases_list = [
         "description": "Multiple authentication requests structural mismatch occurred within 40 seconds. Credentials match external dark-web distributions."
     }
 ]
+
+# 3. Explicit Preflight Handler (Ensures OPTIONS requests never fail)
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "preflight_ok"})
+        response.headers.add("Access-Control-Allow-Origin", "https://krutikawarke2005-rgb.github.io")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
 
 @app.route('/api/auth/login', methods=['POST'])
 def secure_login():
