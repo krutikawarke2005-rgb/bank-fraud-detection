@@ -1,8 +1,19 @@
-const API_BASE = "http://127.0.0.1:5000/api";
+// Live production Render URL
+const API_BASE = "https://bank-fraud-detection-wdpn.onrender.com/api";
 
 let clientCasesList = [];
 let activeTargetIndex = null;
-let userRole = ""; // Keeps track of whether the logged-in user is an Admin or Officer
+let userRole = ""; 
+
+// Helper function to streamline cross-origin session requests
+const fetchOptions = (options = {}) => ({
+    credentials: 'include',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 // ==========================================
 // LOGIN PROCESS
@@ -14,11 +25,10 @@ async function processLogin(event) {
     const errorLog = document.getElementById("login-error");
 
     try {
-        const response = await fetch(`${API_BASE}/auth/login`, {
+        const response = await fetch(`${API_BASE}/auth/login`, fetchOptions({
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: emailValue, password: passwordValue })
-        });
+        }));
 
         const data = await response.json();
 
@@ -27,9 +37,7 @@ async function processLogin(event) {
             return;
         }
 
-        // Save the role from the backend
         userRole = data.role;
-
         errorLog.style.color = "var(--color-success)";
         errorLog.innerText = `Logged in as ${userRole}...`;
 
@@ -38,9 +46,7 @@ async function processLogin(event) {
             document.getElementById("dashboard-screen").classList.remove("hidden");
             document.getElementById("logged-user").innerText = data.email;
             
-            // Administrative access control check
             if (userRole === "Admin") {
-                // If they are an admin, we show admin options or alerts
                 console.log("Admin permissions granted.");
             }
             
@@ -53,7 +59,7 @@ async function processLogin(event) {
 }
 
 async function logOut() {
-    await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+    await fetch(`${API_BASE}/auth/logout`, fetchOptions({ method: 'POST' }));
     document.getElementById("auth-form").reset();
     document.getElementById("login-error").innerText = "";
     document.getElementById("dashboard-screen").classList.add("hidden");
@@ -66,7 +72,7 @@ async function logOut() {
 // ==========================================
 async function fetchPipelineData() {
     try {
-        const response = await fetch(`${API_BASE}/dashboard/data`);
+        const response = await fetch(`${API_BASE}/dashboard/data`, fetchOptions());
         const data = await response.json();
         
         clientCasesList = data.cases;
@@ -141,7 +147,6 @@ function closePopup() {
 async function handleResolution(actionMessage, isFraudCounterIncrement) {
     if (activeTargetIndex === null) return;
     
-    // Simple verification check example: Only Admin can dismiss high risk cases if you want
     if (isFraudCounterIncrement === false && userRole !== "Admin" && clientCasesList[activeTargetIndex].riskPercent > 90) {
         alert("Action Denied: Only an Admin can dismiss high-risk threats.");
         return;
@@ -150,14 +155,13 @@ async function handleResolution(actionMessage, isFraudCounterIncrement) {
     const targetCase = clientCasesList[activeTargetIndex];
     
     try {
-        const response = await fetch(`${API_BASE}/cases/resolve`, {
+        const response = await fetch(`${API_BASE}/cases/resolve`, fetchOptions({
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 caseId: targetCase.id,
                 isFraud: isFraudCounterIncrement
             })
-        });
+        }));
         
         if (response.ok) {
             alert(`Action completed: ${actionMessage}`);
@@ -171,7 +175,7 @@ async function handleResolution(actionMessage, isFraudCounterIncrement) {
 
 async function addNewSimulatedFraud() {
     try {
-        const response = await fetch(`${API_BASE}/cases/simulate`, { method: 'POST' });
+        const response = await fetch(`${API_BASE}/cases/simulate`, fetchOptions({ method: 'POST' }));
         if (response.ok) {
             fetchPipelineData();
         }
@@ -179,10 +183,11 @@ async function addNewSimulatedFraud() {
         console.error("Failed to simulate threat:", err);
     }
 }
+
 async function checkAdminAccess() {
     if (userRole === "Admin") {
         try {
-            const response = await fetch(`${API_BASE}/dashboard/data`);
+            const response = await fetch(`${API_BASE}/dashboard/data`, fetchOptions());
             const data = await response.json();
             
             const logRows = document.getElementById("audit-log-rows");
@@ -198,7 +203,6 @@ async function checkAdminAccess() {
                 logRows.innerHTML += `<div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">${log}</div>`;
             });
             
-            // Show the panel for Admin
             document.getElementById("audit-log-section").style.display = "block";
             alert("Access Granted: Displaying decrypted secure security trailing logs.");
             
@@ -209,12 +213,10 @@ async function checkAdminAccess() {
                 <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">🤖 ANOMALY ENGINE: Behavioral analysis model metrics synced normally.</div>
                 <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); color: var(--color-danger);">⚠️ LOCAL MODE: Backend pipeline connection handshake timed out. Showing cached logs.</div>
             `;
-            // Show the panel for Admin even in fallback mode
             document.getElementById("audit-log-section").style.display = "block";
             alert("Access Granted: Displaying decrypted secure security trailing logs.");
         }
     } else {
-        // 🔒 LOCK IT DOWN: Hide the panel immediately if they are not an Admin
         document.getElementById("audit-log-section").style.display = "none";
         alert("Access Denied: This feature is strictly restricted to Admin accounts.");
     }
