@@ -1,5 +1,5 @@
 // Target API backend domain
-const API_BASE = "https://bank-fraud-detection-2.onrender.com";
+const API_BASE = "https://bank-fraud-detection-2.onrender.com/api";
 
 let clientCasesList = [];
 let activeTargetIndex = null;
