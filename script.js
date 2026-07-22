@@ -1,11 +1,11 @@
-// Live production Render URL
+// Target API backend domain
 const API_BASE = "https://bank-fraud-detection-2.onrender.com";
 
 let clientCasesList = [];
 let activeTargetIndex = null;
 let userRole = ""; 
 
-// Helper function to streamline cross-origin session requests
+// Utility to carry session cookies across domains
 const fetchOptions = (options = {}) => ({
     credentials: 'include',
     ...options,
@@ -45,11 +45,6 @@ async function processLogin(event) {
             document.getElementById("login-screen").classList.add("hidden");
             document.getElementById("dashboard-screen").classList.remove("hidden");
             document.getElementById("logged-user").innerText = data.email;
-            
-            if (userRole === "Admin") {
-                console.log("Admin permissions granted.");
-            }
-            
             fetchPipelineData();
         }, 800);
 
@@ -68,7 +63,7 @@ async function logOut() {
 }
 
 // ==========================================
-// GET DATA FROM BACKEND
+// FETCH METRICS & CASES
 // ==========================================
 async function fetchPipelineData() {
     try {
@@ -83,7 +78,7 @@ async function fetchPipelineData() {
 }
 
 // ==========================================
-// RENDER DATA TO YOUR EXISTING HTML
+// DOM RENDERER
 // ==========================================
 function renderDashboardView(metrics) {
     const tableBody = document.getElementById("table-rows");
@@ -122,7 +117,7 @@ function renderDashboardView(metrics) {
 }
 
 // ==========================================
-// POPUP CONTROLS
+// POPUP INSPECTOR & ACTIONS
 // ==========================================
 function openPopupInspector(index) {
     activeTargetIndex = index;
@@ -181,43 +176,5 @@ async function addNewSimulatedFraud() {
         }
     } catch (err) {
         console.error("Failed to simulate threat:", err);
-    }
-}
-
-async function checkAdminAccess() {
-    if (userRole === "Admin") {
-        try {
-            const response = await fetch(`${API_BASE}/dashboard/data`, fetchOptions());
-            const data = await response.json();
-            
-            const logRows = document.getElementById("audit-log-rows");
-            logRows.innerHTML = ""; 
-            
-            const logs = (data && data.auditLogs && data.auditLogs.length > 0) ? data.auditLogs : [
-                "⚙️ SYSTEM BOOTSTRAP: Secure gateway firewall handshakes online.",
-                "🤖 ANOMALY ENGINE: Behavioral analysis model metrics synced normally.",
-                "🛡️ ACCESS LOG: Admin authenticated successfully."
-            ];
-            
-            logs.forEach(log => {
-                logRows.innerHTML += `<div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">${log}</div>`;
-            });
-            
-            document.getElementById("audit-log-section").style.display = "block";
-            alert("Access Granted: Displaying decrypted secure security trailing logs.");
-            
-        } catch (err) {
-            const logRows = document.getElementById("audit-log-rows");
-            logRows.innerHTML = `
-                <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">⚙️ SYSTEM BOOTSTRAP: Secure gateway firewall handshakes online.</div>
-                <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">🤖 ANOMALY ENGINE: Behavioral analysis model metrics synced normally.</div>
-                <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); color: var(--color-danger);">⚠️ LOCAL MODE: Backend pipeline connection handshake timed out. Showing cached logs.</div>
-            `;
-            document.getElementById("audit-log-section").style.display = "block";
-            alert("Access Granted: Displaying decrypted secure security trailing logs.");
-        }
-    } else {
-        document.getElementById("audit-log-section").style.display = "none";
-        alert("Access Denied: This feature is strictly restricted to Admin accounts.");
     }
 }
