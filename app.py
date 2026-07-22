@@ -3,27 +3,40 @@ from flask_cors import CORS
 import random
 
 app = Flask(__name__)
-
-# 1. Airtight CORS Configuration
-CORS(app, 
-     supports_credentials=True, 
-     origins=[
-         "https://krutikawarke2005-rgb.github.io",
-         "https://krutikawarke2005-rgb.github.io/bank-fraud-detection"
-     ],
-     allow_headers=["Content-Type", "Authorization"],
-     methods=["GET", "POST", "OPTIONS"])
-
 app.secret_key = 'super_secure_bank_operational_encryption_token_key'
 
-# 2. REQUIRED FOR CROSS-DOMAIN SESSIONS (github.io <-> onrender.com)
+# 1. Initialize CORS globally
+CORS(app, supports_credentials=True)
+
+# 2. Configure Cross-Domain Cookie Session Settings for GitHub Pages <-> Render
 app.config.update(
     SESSION_COOKIE_SAMESITE='None',
-    SESSION_COOKIE_SECURE=True,  # Requires HTTPS (which Render provides automatically)
+    SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True
 )
 
-# LIVE RUNTIME DATABASE STRUCTURE
+# 3. Universal CORS & Preflight Response Interceptor
+@app.after_request
+def apply_cors_headers(response):
+    origin = request.headers.get("Origin")
+    allowed_origins = [
+        "https://krutikawarke2005-rgb.github.io",
+        "https://krutikawarke2005-rgb.github.io/bank-fraud-detection"
+    ]
+    
+    if origin in allowed_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
+    
+    # Respond immediately with 200 OK for browser preflight pings
+    if request.method == "OPTIONS":
+        response.status_code = 200
+
+    return response
+
+# Live Database Mock State
 daily_metrics = {
     "fraudBlockedCount": 42,
     "mitigatedExposureAmount": 184200.00
@@ -54,19 +67,11 @@ fraud_cases_list = [
     }
 ]
 
-# 3. Explicit Preflight Handler (Ensures OPTIONS requests never fail)
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        response = jsonify({"status": "preflight_ok"})
-        response.headers.add("Access-Control-Allow-Origin", "https://krutikawarke2005-rgb.github.io")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-        return response, 200
-
-@app.route('/api/auth/login', methods=['POST'])
+@app.route('/api/auth/login', methods=['POST', 'OPTIONS'])
 def secure_login():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
     data = request.json or {}
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
@@ -83,20 +88,23 @@ def secure_login():
     session['user_role'] = role
     return jsonify({"success": True, "email": email, "role": role})
 
-@app.route('/api/auth/logout', methods=['POST'])
+@app.route('/api/auth/logout', methods=['POST', 'OPTIONS'])
 def secure_logout():
     session.clear()
     return jsonify({"success": True})
 
-@app.route('/api/dashboard/data', methods=['GET'])
+@app.route('/api/dashboard/data', methods=['GET', 'OPTIONS'])
 def get_dashboard_data():
     return jsonify({
         "metrics": daily_metrics,
         "cases": fraud_cases_list
     })
 
-@app.route('/api/cases/resolve', methods=['POST'])
+@app.route('/api/cases/resolve', methods=['POST', 'OPTIONS'])
 def resolve_incident():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
     data = request.json or {}
     case_id = data.get('caseId')
     is_fraud = data.get('isFraud', False)
@@ -115,8 +123,11 @@ def resolve_incident():
     fraud_cases_list = [c for c in fraud_cases_list if c['id'] != case_id]
     return jsonify({"success": True, "metrics": daily_metrics})
 
-@app.route('/api/cases/simulate', methods=['POST'])
+@app.route('/api/cases/simulate', methods=['POST', 'OPTIONS'])
 def simulate_threat():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
     vectors = [
         {"title": "Simulated SIM Swap Anomaly", "desc": "Mobile network handshake identifier routing changed profile registers rapidly out-of-zone.", "loc": "Chicago, US", "dev": "Carrier API Hook"},
         {"title": "Malicious APK Overlay Spyware", "desc": "A side-loaded android application package structure was identified running structural process memory injection windows.", "loc": "Mumbai, IN", "dev": "Mobile App Webview"}
@@ -139,3 +150,6 @@ def simulate_threat():
     
     fraud_cases_list.insert(0, new_case)
     return jsonify({"success": True, "cases": fraud_cases_list})
+
+if __name__ == '__main__':
+    app.run(debug=True)
