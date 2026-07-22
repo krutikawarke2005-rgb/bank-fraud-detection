@@ -1,5 +1,5 @@
 // Live production Render URL
-const API_BASE = "https://bank-fraud-detection-wdpn.onrender.com/api";
+const API_BASE = "https://bank-fraud-detection-2.onrender.com";
 
 let clientCasesList = [];
 let activeTargetIndex = null;
